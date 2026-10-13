@@ -1,0 +1,1061 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>七步工作流 · AI 短剧生产管线</title>
+<style>
+  :root {
+    --primary: #6366f1;
+    --primary-dark: #4f46e5;
+    --violet: #8b5cf6;
+    --bg: #f1f5f9;
+    --card: #ffffff;
+    --text: #0f172a;
+    --text-secondary: #475569;
+    --text-muted: #94a3b8;
+    --border: #e2e8f0;
+    --amber: #f59e0b;
+    --amber-bg: #fffbeb;
+    --amber-border: #fde68a;
+    --green: #10b981;
+    --green-bg: #ecfdf5;
+    --red: #ef4444;
+    --red-bg: #fef2f2;
+    --shadow: 0 1px 3px rgba(15, 23, 42, .06), 0 8px 24px rgba(15, 23, 42, .06);
+    --radius: 16px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", -apple-system, "Segoe UI", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.75;
+    min-height: 100vh;
+  }
+
+  /* ===== 顶部 Hero ===== */
+  .hero {
+    background: linear-gradient(135deg, #312e81 0%, #4f46e5 45%, #7c3aed 100%);
+    color: #fff;
+    padding: 44px 24px 96px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .hero::before,
+  .hero::after {
+    content: "";
+    position: absolute;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, .07);
+  }
+  .hero::before { width: 420px; height: 420px; top: -200px; right: -120px; }
+  .hero::after { width: 300px; height: 300px; bottom: -180px; left: -80px; }
+
+  .hero-badge {
+    display: inline-block;
+    padding: 5px 16px;
+    border: 1px solid rgba(255, 255, 255, .35);
+    border-radius: 999px;
+    font-size: 13px;
+    letter-spacing: 2px;
+    margin-bottom: 18px;
+    backdrop-filter: blur(4px);
+    background: rgba(255, 255, 255, .08);
+  }
+  .hero h1 {
+    font-size: clamp(30px, 5vw, 44px);
+    font-weight: 800;
+    letter-spacing: 1px;
+    margin-bottom: 12px;
+  }
+  .hero p {
+    font-size: clamp(14px, 2vw, 16px);
+    opacity: .85;
+    max-width: 640px;
+    margin: 0 auto;
+  }
+
+  /* ===== 主容器 ===== */
+  .container {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 0 20px 60px;
+  }
+
+  /* ===== 标签导航（吸顶） ===== */
+  .tabs-wrap {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    margin-top: -56px;
+    padding: 10px 0 12px;
+  }
+  .tabs {
+    display: flex;
+    gap: 8px;
+    background: rgba(255, 255, 255, .92);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 8px;
+    box-shadow: var(--shadow);
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .tabs::-webkit-scrollbar { display: none; }
+
+  .tab {
+    flex: 1 0 auto;
+    min-width: 108px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 9px 10px 8px;
+    border: none;
+    border-radius: 10px;
+    background: transparent;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background .2s, color .2s, transform .15s;
+    color: var(--text-secondary);
+    white-space: nowrap;
+  }
+  .tab:hover { background: #eef2ff; color: var(--primary-dark); }
+  .tab:active { transform: scale(.97); }
+  .tab .tab-num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: #e2e8f0;
+    color: var(--text-secondary);
+    font-size: 13px;
+    font-weight: 700;
+    transition: all .2s;
+  }
+  .tab .tab-label { font-size: 13px; font-weight: 600; }
+  .tab.active {
+    background: linear-gradient(135deg, var(--primary), var(--violet));
+    color: #fff;
+    box-shadow: 0 4px 14px rgba(99, 102, 241, .4);
+  }
+  .tab.active .tab-num { background: rgba(255, 255, 255, .25); color: #fff; }
+
+  /* ===== 进度条 ===== */
+  .progress-bar {
+    height: 6px;
+    background: #e2e8f0;
+    border-radius: 999px;
+    margin: 22px 4px 0;
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    width: 14.28%;
+    background: linear-gradient(90deg, var(--primary), var(--violet));
+    border-radius: 999px;
+    transition: width .45s cubic-bezier(.65, 0, .35, 1);
+  }
+  .progress-text {
+    text-align: center;
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-top: 8px;
+    letter-spacing: 1px;
+  }
+
+  /* ===== 步骤内容 ===== */
+  .step-panel { display: none; }
+  .step-panel.active { display: block; animation: fadeUp .45s ease both; }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(18px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .step-card {
+    background: var(--card);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    border: 1px solid var(--border);
+    padding: 36px 40px;
+    margin-top: 24px;
+  }
+
+  .step-head { display: flex; align-items: flex-start; gap: 18px; margin-bottom: 8px; }
+  .step-icon {
+    flex-shrink: 0;
+    width: 58px;
+    height: 58px;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    background: linear-gradient(135deg, #eef2ff, #f5f3ff);
+    border: 1px solid #e0e7ff;
+  }
+  .step-head h2 { font-size: 26px; font-weight: 800; line-height: 1.3; }
+  .step-head .step-sub {
+    font-size: 14px;
+    color: var(--text-muted);
+    font-weight: 500;
+    margin-top: 2px;
+  }
+  .step-tagline {
+    display: inline-block;
+    margin: 14px 0 22px;
+    padding: 8px 18px;
+    background: linear-gradient(135deg, #eef2ff, #f5f3ff);
+    border: 1px solid #e0e7ff;
+    border-radius: 10px;
+    color: var(--primary-dark);
+    font-weight: 600;
+    font-size: 15px;
+  }
+
+  .step-card h3 {
+    font-size: 17px;
+    font-weight: 700;
+    margin: 26px 0 12px;
+    padding-left: 12px;
+    border-left: 4px solid var(--primary);
+    line-height: 1.4;
+  }
+  .step-card h3:first-of-type { margin-top: 20px; }
+
+  .step-card p { color: var(--text-secondary); margin-bottom: 10px; }
+  .step-card strong { color: var(--text); }
+
+  .step-card ul, .step-card ol {
+    margin: 4px 0 14px 4px;
+    padding-left: 22px;
+    color: var(--text-secondary);
+  }
+  .step-card li { margin-bottom: 8px; }
+  .step-card li::marker { color: var(--primary); font-weight: 700; }
+
+  /* 提示框 */
+  .callout {
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin: 16px 0;
+    font-size: 14.5px;
+    border: 1px solid;
+    line-height: 1.7;
+  }
+  .callout .callout-title {
+    font-weight: 700;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .callout.warn { background: var(--amber-bg); border-color: var(--amber-border); color: #92400e; }
+  .callout.tip  { background: var(--green-bg); border-color: #a7f3d0; color: #065f46; }
+  .callout.quote { background: #eef2ff; border-color: #c7d2fe; color: #3730a3; }
+
+  /* 字段/维度网格 */
+  .chip-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 10px;
+    margin: 14px 0 18px;
+  }
+  .chip {
+    background: #f8fafc;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 10px;
+    text-align: center;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    transition: all .2s;
+  }
+  .chip:hover {
+    border-color: var(--primary);
+    color: var(--primary-dark);
+    background: #eef2ff;
+    transform: translateY(-2px);
+  }
+  .chip .chip-emoji { display: block; font-size: 20px; margin-bottom: 4px; }
+
+  /* 资产三类卡片 */
+  .asset-cols {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+    gap: 14px;
+    margin: 14px 0 18px;
+  }
+  .asset-card {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px;
+    background: #f8fafc;
+    transition: all .2s;
+  }
+  .asset-card:hover { border-color: var(--primary); box-shadow: 0 6px 18px rgba(99,102,241,.12); transform: translateY(-2px); }
+  .asset-card h4 { font-size: 15.5px; margin-bottom: 8px; color: var(--text); }
+  .asset-card ul { margin: 0; padding-left: 18px; font-size: 13.5px; }
+  .asset-card li { margin-bottom: 5px; }
+
+  /* 流程链 */
+  .flow {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: stretch;
+    gap: 8px;
+    margin: 16px 0 20px;
+  }
+  .flow-node {
+    flex: 1 1 150px;
+    background: linear-gradient(135deg, #eef2ff, #f5f3ff);
+    border: 1px solid #e0e7ff;
+    border-radius: 12px;
+    padding: 14px 16px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--primary-dark);
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 2px;
+  }
+  .flow-node small { font-weight: 500; color: var(--text-muted); font-size: 12px; }
+  .flow-arrow {
+    align-self: center;
+    color: var(--primary);
+    font-weight: 800;
+    font-size: 18px;
+  }
+
+  /* 表格 */
+  .table-wrap { overflow-x: auto; margin: 14px 0 18px; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+    background: #fff;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+  }
+  th {
+    background: linear-gradient(135deg, var(--primary), var(--violet));
+    color: #fff;
+    padding: 11px 14px;
+    text-align: left;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  td { padding: 11px 14px; border-top: 1px solid var(--border); color: var(--text-secondary); }
+  tr:nth-child(even) td { background: #f8fafc; }
+
+  /* 提示词公式 */
+  .formula {
+    background: #0f172a;
+    color: #e2e8f0;
+    border-radius: 12px;
+    padding: 18px 22px;
+    font-family: "SF Mono", "JetBrains Mono", Consolas, "Courier New", monospace;
+    font-size: 13.5px;
+    line-height: 2;
+    margin: 14px 0 18px;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+  .formula .f-plus { color: #fbbf24; font-weight: 700; }
+  .formula .f-part { color: #7dd3fc; }
+  .formula .f-desc { color: #94a3b8; font-family: inherit; font-size: 12px; }
+
+  /* ===== 提示词模板 ===== */
+  .prompt-box {
+    position: relative;
+    background: #0f172a;
+    border: 1px solid #1e293b;
+    border-radius: 12px;
+    margin: 14px 0 8px;
+  }
+  .prompt-box pre {
+    padding: 20px 22px;
+    overflow-x: auto;
+    font-family: "SF Mono", "JetBrains Mono", Consolas, "Courier New", monospace;
+    font-size: 13px;
+    line-height: 1.9;
+    color: #e2e8f0;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .copy-btn {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    padding: 5px 13px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #94a3b8;
+    background: rgba(30, 41, 59, .85);
+    border: 1px solid #334155;
+    border-radius: 7px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all .2s;
+    z-index: 2;
+  }
+  .copy-btn:hover { color: #fff; border-color: #6366f1; background: rgba(99, 102, 241, .3); }
+  .copy-btn.copied { color: #34d399; border-color: #10b981; background: rgba(16, 185, 129, .15); }
+
+  /* ===== 底部导航 ===== */
+  .nav-buttons {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 14px;
+    margin-top: 26px;
+  }
+  .nav-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 13px 26px;
+    border: none;
+    border-radius: 12px;
+    font-family: inherit;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all .2s;
+  }
+  .nav-btn.prev {
+    background: #fff;
+    color: var(--text-secondary);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+  }
+  .nav-btn.prev:hover:not(:disabled) { color: var(--primary-dark); border-color: var(--primary); transform: translateX(-3px); }
+  .nav-btn.next {
+    background: linear-gradient(135deg, var(--primary), var(--violet));
+    color: #fff;
+    box-shadow: 0 6px 18px rgba(99, 102, 241, .35);
+  }
+  .nav-btn.next:hover:not(:disabled) { transform: translateX(3px); box-shadow: 0 8px 24px rgba(99, 102, 241, .45); }
+  .nav-btn:disabled { opacity: .35; cursor: not-allowed; }
+  .nav-btn .arrow { font-size: 17px; }
+
+  .nav-hint {
+    text-align: center;
+    font-size: 12.5px;
+    color: var(--text-muted);
+    margin-top: 18px;
+  }
+  .nav-hint kbd {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-bottom-width: 2px;
+    border-radius: 5px;
+    padding: 1px 7px;
+    font-size: 11.5px;
+    font-family: inherit;
+    color: var(--text-secondary);
+  }
+
+  footer {
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 12.5px;
+    padding: 26px 0 10px;
+  }
+
+  /* ===== 响应式 ===== */
+  @media (max-width: 640px) {
+    .hero { padding: 34px 16px 88px; }
+    .step-card { padding: 26px 22px; }
+    .step-head h2 { font-size: 21px; }
+    .step-icon { width: 46px; height: 46px; font-size: 22px; }
+    .tab { min-width: 92px; }
+    .tab .tab-label { font-size: 12px; }
+    .nav-btn { padding: 12px 18px; font-size: 14px; }
+    .flow-arrow { transform: rotate(90deg); }
+  }
+</style>
+</head>
+<body>
+
+<!-- ===== Hero ===== -->
+<header class="hero">
+  <div class="hero-badge">AI 短剧生产管线</div>
+  <h1>七步工作流</h1>
+  <p>从小说文本到成片交付的完整生产链路：每一步都有明确入口、标准对齐的输入与输出。</p>
+</header>
+
+<div class="container">
+
+  <!-- ===== 顶部 7 个标签 ===== -->
+  <div class="tabs-wrap">
+    <nav class="tabs" id="tabs" aria-label="步骤导航"></nav>
+  </div>
+
+  <!-- 进度条 -->
+  <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+  <div class="progress-text" id="progressText"></div>
+
+  <!-- ===== 步骤 1 ===== -->
+  <section class="step-panel" data-step="1">
+    <div class="step-card">
+      <div class="step-head">
+        <div class="step-icon">📖</div>
+        <div>
+          <h2>小说转标准剧本</h2>
+          <div class="step-sub">把文字变成「可拍摄」的指令</div>
+        </div>
+      </div>
+      <div class="step-tagline">核心是 Show don't Tell —— 能被镜头拍到的，才算数</div>
+
+      <p>小说擅长写「心里怎么想」，但摄影机拍不到内心独白。这一步的关键，是把<strong>抽象的心理描写</strong>改写成<strong>能被镜头拍到的动作、表情、道具和场面</strong>。</p>
+
+      <h3>每个场景必须明确五件事</h3>
+      <div class="chip-grid">
+        <div class="chip"><span class="chip-emoji">🧑</span>谁</div>
+        <div class="chip"><span class="chip-emoji">📍</span>在哪</div>
+        <div class="chip"><span class="chip-emoji">🏃</span>做什么动作</div>
+        <div class="chip"><span class="chip-emoji">💬</span>说什么台词</div>
+        <div class="chip"><span class="chip-emoji">🎭</span>什么情绪</div>
+      </div>
+
+      <h3>改写示例</h3>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th style="width:50%">小说原文（Tell）</th><th>标准剧本（Show）</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>他内心十分紧张，害怕被揭穿。</td>
+              <td>他攥紧的拳头微微发抖，喉结滚动了一下，避开对方的目光，把文件往身后藏。</td>
+            </tr>
+            <tr>
+              <td>她其实早就原谅了他。</td>
+              <td>她接过他递来的伞，指尖在伞柄上停了半秒，最终没有推开。雨里，两人共一把伞，距离很近。</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout quote">
+        <div class="callout-title">🏢 腾讯云山海团队实践</div>
+        把创作动作从「分散在不同人员、文档、聊天记录」变为「为每个生产动作设置明确的入口、标准对齐的输入输出」，是稳定交付的前提。
+      </div>
+
+      <h3>📋 可复制提示词模板</h3>
+      <p>把【】里的内容替换成你自己的素材，即可直接粘贴使用：</p>
+      <div class="prompt-box">
+        <button class="copy-btn" onclick="copyPrompt(this)">复制</button>
+        <pre><code>你是一位专业短剧编剧。请将以下小说片段改编为横屏短剧剧本（16:9）。
+
+【粘贴小说原文】
+
+要求：
+1. 每集6-12场，每场15-45秒
+2. 心理描写必须全部转化为可见动作、表情或道具
+3. 格式：
+   场次｜时间｜地点｜人物
+   画面动作（谁、在哪、做什么、什么情绪）
+   台词/旁白
+   环境音
+4. 禁止出现旁白式心理叙述
+5. 每场结尾留钩子</code></pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 步骤 2 ===== -->
+  <section class="step-panel" data-step="2">
+    <div class="step-card">
+      <div class="step-head">
+        <div class="step-icon">🎬</div>
+        <div>
+          <h2>剧本转分镜表</h2>
+          <div class="step-sub">把剧本拆解成可执行的镜头清单</div>
+        </div>
+      </div>
+      <div class="step-tagline">标准分镜表：让每一镜都有据可依</div>
+
+      <h3>标准分镜表七要素</h3>
+      <div class="chip-grid">
+        <div class="chip"><span class="chip-emoji">🔢</span>镜号</div>
+        <div class="chip"><span class="chip-emoji">🔭</span>景别</div>
+        <div class="chip"><span class="chip-emoji">🎥</span>运镜</div>
+        <div class="chip"><span class="chip-emoji">🖼️</span>画面描述</div>
+        <div class="chip"><span class="chip-emoji">🔊</span>音效推荐</div>
+        <div class="chip"><span class="chip-emoji">🗣️</span>旁白 / 台词</div>
+        <div class="chip"><span class="chip-emoji">⏱️</span>时长</div>
+      </div>
+
+      <h3>节奏控制</h3>
+      <ul>
+        <li><strong>每集控制在 10-13 镜</strong>，保证信息密度与观看节奏的平衡</li>
+        <li><strong>每镜不超过 5 秒</strong>，适配短视频的注意力窗口</li>
+      </ul>
+
+      <h3>分镜脚本 · 10 维度提示词标准</h3>
+      <p>写画面提示词时，从以下 10 个维度完整描述，可大幅提升生成稳定性：</p>
+      <div class="chip-grid">
+        <div class="chip">景别</div>
+        <div class="chip">机位</div>
+        <div class="chip">光线</div>
+        <div class="chip">色彩</div>
+        <div class="chip">构图</div>
+        <div class="chip">动作</div>
+        <div class="chip">表情</div>
+        <div class="chip">服装</div>
+        <div class="chip">场景</div>
+        <div class="chip">氛围</div>
+      </div>
+
+      <div class="callout tip">
+        <div class="callout-title">💡 实践要点</div>
+        分镜表是整个流程的「施工图纸」——后续资产提取、首帧生成、视频合成全部以它为准，值得在这里多花时间。分镜表也是最不容易乱的对齐容器：出图、配音、装配全部按镜号对齐。
+      </div>
+
+      <h3>📋 可复制提示词模板</h3>
+      <p>把【】里的内容替换成你自己的素材，即可直接粘贴使用：</p>
+      <div class="prompt-box">
+        <button class="copy-btn" onclick="copyPrompt(this)">复制</button>
+        <pre><code>请将第【X】集展开为详细分镜脚本。
+
+格式：
+〖镜头N〗
+时长：5秒
+景别：近景/中景/远景/特写
+场景：【具体环境，光线、天气、时间】
+人物：【外貌+服装+表情+动作】
+镜头运动：推/拉/摇/移/固定
+AI视频提示词（中文）：【画面描述】
+对话/旁白：【如有】
+音效/BGM：【氛围描述】
+
+铁律：
+- 每镜头3-8秒
+- 每镜头只一个主要动作
+- 角色描述每次完整复用（粘贴角色卡片原文）
+- 避免画面内文字，对话通过后期配音</code></pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 步骤 3 ===== -->
+  <section class="step-panel" data-step="3">
+    <div class="step-card">
+      <div class="step-head">
+        <div class="step-icon">🗂️</div>
+        <div>
+          <h2>提取资产（角色 / 场景 / 道具）</h2>
+          <div class="step-sub">从剧本中系统化沉淀可复用素材</div>
+        </div>
+      </div>
+      <div class="step-tagline">三类资产，各有各的标准配置</div>
+
+      <p>通读分镜表，把全片需要的视觉元素<strong>系统化提取</strong>为三类资产，避免每镜临时生成导致的风格漂移：</p>
+
+      <div class="asset-cols">
+        <div class="asset-card">
+          <h4>🧑 角色资产</h4>
+          <ul>
+            <li>定妆照</li>
+            <li>三视图（正面 / 侧面 / 背面）</li>
+            <li>面部特写</li>
+            <li>表情变体</li>
+          </ul>
+        </div>
+        <div class="asset-card">
+          <h4>🏙️ 场景资产</h4>
+          <ul>
+            <li>主设定图</li>
+            <li>多角度变体（日景 / 夜景 / 氛围变体）</li>
+          </ul>
+        </div>
+        <div class="asset-card">
+          <h4>🎒 道具资产</h4>
+          <ul>
+            <li>单件道具参考图</li>
+            <li>场景中道具摆放参考</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="callout tip">
+        <div class="callout-title">💡 为什么先提资产</div>
+        先提资产再生成，才能把「跨镜复用」变成可能——同一张脸、同一个场景，在不同镜头里保持一致。
+      </div>
+
+      <h3>📋 可复制提示词模板</h3>
+      <p>从剧本中系统化提取三类资产，生成可直接用于图像生成平台的「视觉 DNA」指令。把【】里的内容替换成你自己的素材，即可直接粘贴使用：</p>
+      <div class="prompt-box">
+        <button class="copy-btn" onclick="copyPrompt(this)">复制</button>
+        <pre><code>请从以下剧本中提取全部视觉资产，输出三类清单：
+
+【粘贴剧本】
+
+一、角色资产
+- 角色名｜性别｜年龄｜脸型五官｜发型发色｜服装｜标志物（痣/眼镜/耳环等）
+- 每个角色的外貌锚点（每镜原样粘贴的固定描述句）
+
+二、场景资产
+- 场景名｜时间｜光线方向｜色温｜主色调｜固定道具摆放
+
+三、道具资产
+- 道具名｜外观描述｜在哪些场次出现</code></pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 步骤 4 ===== -->
+  <section class="step-panel" data-step="4">
+    <div class="step-card">
+      <div class="step-head">
+        <div class="step-icon">🔐</div>
+        <div>
+          <h2>生成资产库并锁定一致性</h2>
+          <div class="step-sub">全流程最容易翻车的一步</div>
+        </div>
+      </div>
+      <div class="step-tagline">一致性靠机制，不靠「提示词写得好」</div>
+
+      <div class="callout warn">
+        <div class="callout-title">⚠️ 高危环节</div>
+        这是最容易翻车的一步——角色「换镜即换脸」是 AI 短剧最常见的废片原因。
+      </div>
+
+      <h3>专业做法</h3>
+      <ul>
+        <li><strong>先建多角度角色表，锁定面孔后</strong>，再按场景分配服装</li>
+        <li><strong>Kling 的 Element Library</strong>：支持上传多角度参考图，AI 会记住角色、道具和场景，一次创建后跨镜头复用</li>
+      </ul>
+
+      <h3>具体流程</h3>
+      <div class="flow">
+        <div class="flow-node">生成母版图<small>定长相</small></div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-node">资产图分场景<small>按场景分配</small></div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-node">换装只动衣服<small>面孔不动</small></div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-node">人眼终选<small>写入档案</small></div>
+      </div>
+
+      <h3>连续性锁（Consistency Lock）</h3>
+      <p>把需要跨镜保持的造型，写成一条<strong>能原样贴进提示词的短语</strong>（连续性锁）；每一镜写完关键帧后，说明依据了哪些条目——漏了会被检查脚本指出。</p>
+
+      <h3>📋 可复制模板：角色定妆卡</h3>
+      <p>定妆卡是保证角色跨镜不走样的核心：先把角色三视图锁死，后续每张图都带参考图，能省下大量返工。把【】里的内容替换成你自己的素材，即可直接粘贴使用：</p>
+      <div class="prompt-box">
+        <button class="copy-btn" onclick="copyPrompt(this)">复制</button>
+        <pre><code>Character design reference sheet, same character shown in 4 views
+arranged left to right (front, 3/4 left, side, back).
+
+Character: 【角色名】
+Identity: 【年龄】岁【国籍/人种】【性别】，【脸型】，【眼睛描述】，【发型发色】，【肤色】，【标志物】
+Outfit: 【上衣颜色+材质+款式】, 【下装】, 【鞋子】, 【配饰】
+Expression: 【基础表情气质】
+Background: white neutral background, flat studio lighting
+Layout: 4 views in a row, readable labels below each view
+Consistent facial features, outfit, and proportions across all views.
+No view merging, no feature drift, no background pollution.</code></pre>
+      </div>
+
+      <div class="callout tip">
+        <div class="callout-title">💡 一句话总结</div>
+        一致性不是「写得细」，而是把稳定要素<strong>固化成可复用、可校验的资产</strong>。
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 步骤 5 ===== -->
+  <section class="step-panel" data-step="5">
+    <div class="step-card">
+      <div class="step-head">
+        <div class="step-icon">⚓</div>
+        <div>
+          <h2>生成首帧（锚点帧）</h2>
+          <div class="step-sub">批量生成前的「定稿」环节</div>
+        </div>
+      </div>
+      <div class="step-tagline">构图、光线、服装全部确定后，再继续</div>
+
+      <p>在批量生成前，先为目标场景生成一张<strong>干净的、锁定的锚点帧</strong>——最终构图、最终光线、最终服装全部确定后再继续，避免带着不确定性进入视频生成。</p>
+
+      <h3>元素绑定</h3>
+      <ul>
+        <li><strong>Kling 3.0</strong> 在首帧 / 首尾帧生成中，支持绑定<strong>最多 3 个元素</strong></li>
+        <li>锁定核心特征，防止换镜时主体变形</li>
+      </ul>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>锚定对象</th><th>锁定内容</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>主角</td><td>面孔 + 当集服装</td></tr>
+            <tr><td>核心道具</td><td>外形 + 关键细节</td></tr>
+            <tr><td>场景</td><td>空间结构 + 光线氛围</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>📋 可复制模板（万相 3.0 公式）</h3>
+      <p>把【】里的内容替换成你自己的素材，即可直接粘贴使用：</p>
+      <div class="prompt-box">
+        <button class="copy-btn" onclick="copyPrompt(this)">复制</button>
+        <pre><code>【总体描述：风格+主体+场景】。
+参考素材：@图片1 作为首帧画面。
+分镜1（0-5秒）：【主体动作】+【场景环境】+【运动方式】+【美学控制：光线/色调/构图】。
+风格/情绪：【风格关键词】。
+负向清单：文字水印，面部畸变，肢体错位，背景闪烁。</code></pre>
+      </div>
+
+      <div class="callout tip">
+        <div class="callout-title">💡 为什么值得单独一步</div>
+        首帧阶段改一张图，比视频生成后返工便宜得多。锚点帧确认无误，再进入图生视频。
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 步骤 6 ===== -->
+  <section class="step-panel" data-step="6">
+    <div class="step-card">
+      <div class="step-head">
+        <div class="step-icon">🎞️</div>
+        <div>
+          <h2>图生视频（首帧 / 首尾帧）</h2>
+          <div class="step-sub">让锚定帧「动起来」</div>
+        </div>
+      </div>
+      <div class="step-tagline">有明确结束姿态时，首帧 + 尾帧比只给首帧可控得多</div>
+
+      <p>把锚点帧作为<strong>首帧图</strong>，写运动提示词描述从 A 帧到 B 帧的运动、运镜和情绪。</p>
+
+      <h3>关键原则</h3>
+      <ul>
+        <li><strong>首帧 + 尾帧同时给</strong>：如果有明确的结束姿态，双帧约束比只给首帧自由发展<strong>可控得多</strong></li>
+        <li>运动提示词聚焦「怎么动」：运动路径、运镜方式、节奏与情绪变化</li>
+      </ul>
+
+      <h3>万相 3.0 提示词公式</h3>
+      <div class="formula">
+<span class="f-part">总体描述</span> <span class="f-plus">+</span> <span class="f-part">参考素材引用</span> <span class="f-plus">+</span> <span class="f-part">分镜（起止秒）</span> <span class="f-plus">+</span> <span class="f-part">台词</span> <span class="f-plus">+</span> <span class="f-part">音效 / BGM</span> <span class="f-plus">+</span> <span class="f-part">风格 / 情绪</span> <span class="f-plus">+</span> <span class="f-part">负向清单</span>
+      </div>
+
+      <h3>📋 可复制模板（运动控制）</h3>
+      <p>运动提示词的关键是<strong>绑定参照物</strong>——不写「挥手」，写「右手抬起至与左肩齐平」。即梦平台需加「静止上半身」防关节错位，可灵需加「以 24fps 恒定输出」防 AI 补帧。把【】里的内容替换成你自己的素材，即可直接粘贴使用：</p>
+      <div class="prompt-box">
+        <button class="copy-btn" onclick="copyPrompt(this)">复制</button>
+        <pre><code>@图片1 作为首帧。
+
+主体：【角色名，粘贴角色卡片原文】
+动作：【具体动作，绑定参照物。示例：右手抬起至与左肩齐平，指尖距耳垂15厘米】
+镜头：【固定机位 / 缓慢横移 / 匀速推进5米】
+时长：5秒
+风格：【画风关键词】
+约束：面部清晰，手部静止，无插值，以24fps恒定输出
+负向：肢体畸变，面部漂移，背景跳变，文字出现</code></pre>
+      </div>
+
+      <div class="callout tip">
+        <div class="callout-title">💡 负向清单别省略</div>
+        「负向清单」用来排除变形、模糊、多余肢体等常见缺陷，是出片率的隐形保障。
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 步骤 7 ===== -->
+  <section class="step-panel" data-step="7">
+    <div class="step-card">
+      <div class="step-head">
+        <div class="step-icon">✂️</div>
+        <div>
+          <h2>剪映合成</h2>
+          <div class="step-sub">从素材到成片的自动化最后一公里</div>
+        </div>
+      </div>
+      <div class="step-tagline">每个分镜独立片段进时间线，可逐镜头编辑</div>
+
+      <h3>自动化方案</h3>
+      <div class="flow">
+        <div class="flow-node">素材与剪辑计划</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-node">可编辑剪映草稿</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-node">原生引擎导出</div>
+      </div>
+
+      <h3>jianying-automation 流水线</h3>
+      <div class="chip-grid">
+        <div class="chip"><span class="chip-emoji">🔍</span>质检</div>
+        <div class="chip"><span class="chip-emoji">⭐</span>择优</div>
+        <div class="chip"><span class="chip-emoji">💧</span>去水印</div>
+        <div class="chip"><span class="chip-emoji">⬛</span>裁黑屏</div>
+        <div class="chip"><span class="chip-emoji">✨</span>超分</div>
+        <div class="chip"><span class="chip-emoji">📝</span>ASR 字幕</div>
+        <div class="chip"><span class="chip-emoji">🎵</span>情绪配乐</div>
+        <div class="chip"><span class="chip-emoji">🧩</span>组装</div>
+        <div class="chip"><span class="chip-emoji">📇</span>注册索引</div>
+        <div class="chip"><span class="chip-emoji">✅</span>验收</div>
+      </div>
+
+      <div class="callout tip">
+        <div class="callout-title">💡 与「concat 成单条」的本质区别</div>
+        每个分镜<strong>独立片段</strong>进入时间线，用户可以在剪映里逐镜头编辑、替换、调序——交付的不是一段不可拆的视频，而是一份可继续创作的工程。
+      </div>
+
+      <h3>📋 可复制模板（剪辑指令）</h3>
+      <p>把【】里的内容替换成你自己的素材，即可直接粘贴使用：</p>
+      <div class="prompt-box">
+        <button class="copy-btn" onclick="copyPrompt(this)">复制</button>
+        <pre><code>请按以下规格组装本集剪辑草稿：
+
+项目名：【剧名】_第X集
+画幅：竖屏 1080×1920（抖音/快手）或横屏 1920×1080
+素材目录：分镜视频_去水印_裁剪/
+音频目录：配音/（按镜号命名）
+字幕：从剧本逐字提取，ASR辅助校对
+
+时间线规则：
+- 每个分镜独立片段，不合并
+- 片头片尾：静态黑底字幕卡
+- 配乐：按情绪段落自动布局
+- 字幕字号/位置：竖屏与横屏分别配置</code></pre>
+      </div>
+
+      <div class="callout warn">
+        <div class="callout-title">🚀 使用顺序建议：先锁资产，再跑分镜</div>
+        先把第 1-3 步跑完（小说 → 剧本 → 分镜表 → 资产清单），然后执行第 4 步生成角色定妆卡，确认形象锁定后，再用第 5 步生成所有首帧图，最后进入第 6 步批量图生视频和第 7 步剪辑。<strong>确认闸门不能省</strong>：任何图片、视频、配音任务，先在文件里看到这批准确的内容和参数，明确确认后才调用外部接口花钱。
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 上一步 / 下一步 ===== -->
+  <div class="nav-buttons">
+    <button class="nav-btn prev" id="prevBtn" onclick="goStep(current - 1)">
+      <span class="arrow">←</span> 上一步
+    </button>
+    <button class="nav-btn next" id="nextBtn" onclick="goStep(current + 1)">
+      下一步 <span class="arrow">→</span>
+    </button>
+  </div>
+  <div class="nav-hint">支持键盘 <kbd>←</kbd> <kbd>→</kbd> 切换步骤，点击顶部标签可直接跳转</div>
+
+  <footer>七步工作流 · AI 短剧生产管线 — 从文本到成片</footer>
+</div>
+
+<script>
+  var STEPS = [
+    { n: 1, label: "小说转剧本", full: "小说转标准剧本" },
+    { n: 2, label: "转分镜表",   full: "剧本转分镜表" },
+    { n: 3, label: "提取资产",   full: "提取资产" },
+    { n: 4, label: "资产库一致性", full: "生成资产库并锁定一致性" },
+    { n: 5, label: "生成首帧",   full: "生成首帧（锚点帧）" },
+    { n: 6, label: "图生视频",   full: "图生视频（首帧/首尾帧）" },
+    { n: 7, label: "剪映合成",   full: "剪映合成" }
+  ];
+
+  var current = 1;
+  var tabsEl = document.getElementById("tabs");
+  var panels = Array.prototype.slice.call(document.querySelectorAll(".step-panel"));
+  var progressFill = document.getElementById("progressFill");
+  var progressText = document.getElementById("progressText");
+  var prevBtn = document.getElementById("prevBtn");
+  var nextBtn = document.getElementById("nextBtn");
+
+  // 生成顶部标签
+  STEPS.forEach(function (s) {
+    var btn = document.createElement("button");
+    btn.className = "tab";
+    btn.id = "tab-" + s.n;
+    btn.setAttribute("onclick", "goStep(" + s.n + ")");
+    btn.innerHTML = '<span class="tab-num">' + s.n + '</span><span class="tab-label">' + s.label + '</span>';
+    tabsEl.appendChild(btn);
+  });
+
+  function goStep(n) {
+    if (n < 1 || n > STEPS.length) return;
+    current = n;
+
+    // 切换标签态
+    STEPS.forEach(function (s) {
+      document.getElementById("tab-" + s.n).classList.toggle("active", s.n === n);
+    });
+
+    // 切换内容面板
+    panels.forEach(function (p) {
+      p.classList.toggle("active", Number(p.getAttribute("data-step")) === n);
+    });
+
+    // 更新进度
+    var pct = (n / STEPS.length) * 100;
+    progressFill.style.width = pct + "%";
+    progressText.textContent = "第 " + n + " 步 / 共 " + STEPS.length + " 步 · " + STEPS[n - 1].full;
+
+    // 更新按钮
+    prevBtn.disabled = (n === 1);
+    nextBtn.disabled = (n === STEPS.length);
+    nextBtn.innerHTML = (n === STEPS.length)
+      ? '已是最后一步 <span class="arrow">✓</span>'
+      : '下一步 <span class="arrow">→</span>';
+
+    // 移动端滚动到内容顶部
+    if (window.innerWidth < 640) {
+      var wrap = document.querySelector(".tabs-wrap");
+      if (wrap) wrap.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }
+
+  // 键盘左右切换
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "ArrowLeft") goStep(current - 1);
+    if (e.key === "ArrowRight") goStep(current + 1);
+  });
+
+  // 一键复制提示词模板
+  function copyPrompt(btn) {
+    var box = btn.closest(".prompt-box");
+    var text = box.querySelector("code").innerText;
+    function done() {
+      btn.textContent = "已复制";
+      btn.classList.add("copied");
+      setTimeout(function () { btn.textContent = "复制"; btn.classList.remove("copied"); }, 1800);
+    }
+    function fallback() {
+      var ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand("copy"); done(); } catch (e) { btn.textContent = "复制失败"; }
+      document.body.removeChild(ta);
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, fallback);
+    } else {
+      fallback();
+    }
+  }
+
+  // 初始化
+  goStep(1);
+</script>
+
+</body>
+</html>
