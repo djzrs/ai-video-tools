@@ -1,6 +1,6 @@
 # ai-video-tools
 
-AI 短剧生产管线工具集：七步工作流交互式页面 + Agnes Image 2.5 Flash 生图工具（网页版 / Python 版）。
+AI 短剧生产管线工具集：七步工作流交互式页面 + Agnes Image 2.5 Flash 生图工具（网页版 / Python 版）+ Agnes Video 2.5 Flash 视频生成工具（Python 版）。
 
 ## 仓库结构
 
@@ -8,10 +8,13 @@ AI 短剧生产管线工具集：七步工作流交互式页面 + Agnes Image 2.
 ai-video-tools/
 ├── index.html                  # 七步工作流交互式页面（单文件，无依赖）
 ├── README.md                   # 本文件
-└── agnes-image-tool/
-    ├── index.html              # Agnes 生图工具 · 网页版（单文件，无依赖）
-    ├── agnes_image.py          # Agnes 生图工具 · Python 版（零依赖，方便 AI 调用）
-    └── README.md               # 生图工具详细文档
+├── agnes-image-tool/
+│   ├── index.html              # Agnes 生图工具 · 网页版（单文件，无依赖）
+│   ├── agnes_image.py          # Agnes 生图工具 · Python 版（零依赖，方便 AI 调用）
+│   └── README.md               # 生图工具详细文档
+└── agnes-video-tool/
+    ├── agnes_video.py          # Agnes 视频生成工具 · Python 版（零依赖，方便 AI 调用）
+    └── README.md               # 视频生成工具详细文档
 ```
 
 ## 一、七步工作流页面
@@ -59,6 +62,32 @@ python agnes_image.py --batch prompts.json --out ./out
 ```
 
 详细参数与批量格式见 [`agnes-image-tool/README.md`](agnes-image-tool/README.md)。
+
+## 三、Agnes Video 2.5 Flash 视频生成工具
+
+基于 [Agnes Video 2.5 Flash](https://agnes-ai.cn/zh-Hans/docs/agnes-video-25-flash) 官方文档实现，支持**文生视频 / 首尾帧控制 / 图片·音频参考生成**，时长 4-12 秒，720P 六种画幅，异步任务轮询 + 自动下载 mp4，输出视频当前限时免费。
+
+> 视频平台（`api.agnes-ai.cn`）与生图平台 Key **不通用**，需单独获取。
+
+```python
+from agnes_video import generate
+r = generate(prompt="雨后的城市街道，霓虹倒映，电影级运镜", mode="text", seconds="5", output_dir="./out")
+```
+
+```bash
+# 文生视频
+python agnes_video.py "雨后的城市街道，霓虹倒映，电影级运镜" --seconds 5 --out ./out
+# 首尾帧控制
+python agnes_video.py "人物转身走向窗边" --mode keyframe --first-frame https://example.com/f.png
+# 图片参考（≤5 张，prompt 用 <Picture N> 指代）
+python agnes_video.py "以 <Picture 1> 为参考，角色奔跑" --mode reference --images https://example.com/c.png
+# 查询续取 / 批量 / 连通性测试
+python agnes_video.py --query VIDEO_ID --out ./out
+python agnes_video.py --batch jobs.json --out ./out
+python agnes_video.py --test
+```
+
+详细参数与批量格式见 [`agnes-video-tool/README.md`](agnes-video-tool/README.md)。
 
 ## 在线预览
 
