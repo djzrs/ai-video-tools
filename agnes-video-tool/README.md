@@ -8,7 +8,7 @@
 
 支持 **文生视频 / 首尾帧控制 / 图片·音频参考生成** 三种工作流；时长 4-12 秒；720P 六种画幅；异步任务创建 → 轮询 → 自动下载 mp4。输出视频当前**限时免费**（¥0/秒，以平台公告为准）。
 
-> 说明：视频 API 与生图 API 为不同平台端点（`api.agnes-ai.cn` vs `apihub.agnes-ai.com`），**API Key 不通用**，需在 Agnes 视频平台单独获取。
+> **端点说明**：官方文档示例为 `api.agnes-ai.cn`（该域需视频平台单独签发的 Key）。本工具默认走 `apihub.agnes-ai.com/v1`——与生图工具同平台、**同一把 Key 通用**（2026-10-14 实测验证），查询端点自动推导为 `{域名}/agnesapi`。可用 `--base-url` 或环境变量 `AGNES_BASE_URL` 覆盖。
 
 ---
 
@@ -135,7 +135,7 @@ python agnes_video.py --batch jobs.json --out ./out
 
 ## 四、注意事项
 
-1. **Key 不通用**：视频平台（`api.agnes-ai.cn`）与生图平台（`apihub.agnes-ai.com`）Key 独立，需分别获取。
+1. **端点与 Key**：工具默认 `apihub.agnes-ai.com/v1`（与生图工具同平台，Key 通用）；官方文档示例域 `api.agnes-ai.cn` 需视频平台单独签发的 Key，两种域可用 `--base-url` 切换。
 2. **媒体必须公网可访问**：`first_frame`/`last_frame`/`images`/`audios` 只接受 http(s) URL，本地文件需先托管到公网（对象存储/图床等）；本地路径会报错并提示。
 3. **模式互斥规则**：text 模式禁止任何媒体字段；keyframe 模式禁止 images/audios；reference 模式禁止 first_frame/last_frame 与 videos。
 4. **查询必须带 model_name**：`keyframe`/`reference` 模式强制；纯 `video_id` 查询仅适用于 text 模式。

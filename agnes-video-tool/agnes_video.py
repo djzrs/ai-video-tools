@@ -51,6 +51,9 @@ API Key 获取顺序：--api-key 参数 > 环境变量 AGNES_API_KEY。
 Base URL 获取顺序：--base-url 参数 > 环境变量 AGNES_BASE_URL > 默认值。
 
 文档依据：https://agnes-ai.cn/zh-Hans/docs/agnes-video-25-flash
+端点说明：官方文档示例为 api.agnes-ai.cn，但该域 Key 与生图平台不通用；
+本工具默认走 apihub.agnes-ai.com（与生图工具同平台，同一把 Key 即可访问，
+2026-10-14 实测验证）。查询端点自动推导为 {域名}/agnesapi。
 关键规则：
   * size 固定为 "720P"（Flash 专属限制），画幅由 aspect_ratio 决定；
   * seconds 为字符串 "4"~"12"，默认 "5"；
@@ -58,6 +61,7 @@ Base URL 获取顺序：--base-url 参数 > 环境变量 AGNES_BASE_URL > 默认
   * mode=reference 时 images≤5、audios≤3，不支持 videos；
   * 查询任务必须带 model_name=agnes-video-2.5-flash（keyframe/reference 模式强制）；
   * 任务完成取响应顶层 url 字段下载视频；
+  * 服务端限流（video queue is full）自动退避重试；
   * 输出视频秒数当前限时免费（¥0/秒），以平台最新公告为准。
 """
 
@@ -80,7 +84,12 @@ from typing import Any, Dict, List, Optional, Sequence
 MODEL = "agnes-video-2.5-flash"
 ENV_API_KEY = "AGNES_API_KEY"
 ENV_BASE_URL = "AGNES_BASE_URL"
-DEFAULT_BASE_URL = "https://api.agnes-ai.cn/v1"
+# 默认端点取 apihub（与生图工具同平台、Key 通用）。
+# 官方文档示例为 https://api.agnes-ai.cn/v1，但该域需要视频平台单独签发的 Key；
+# apihub 域可用同一把 Key 访问视频接口（2026-10-14 实测）。
+# 查询端点由本工具自动推导为 {域名}/agnesapi。
+DEFAULT_BASE_URL = "https://apihub.agnes-ai.com/v1"
+DOC_BASE_URL = "https://api.agnes-ai.cn/v1"
 MODEL_NAME_QUERY = MODEL          # 查询任务时强制携带
 SIZE = "720P"                     # Flash 专属：固定 720P
 DEFAULT_SECONDS = "5"
@@ -276,8 +285,11 @@ def _request(url: str, api_key: str, timeout: int, payload: Optional[Dict[str, A
         raw = e.read().decode("utf-8", "ignore")
         try:
             j = json.loads(raw)
-            # 官方错误格式：{"detail": "..."} 或 {"error": {"message": "..."}}
-            msg = j.get("detail") or (j.get("error") or {}).get("message") or raw[:300]
+            # 错误格式兼容：{"detail": ...} / {"error": {"message": ...}} / {"message": ...}
+            msg = (j.get("detail")
+                   or (j.get("error") or {}).get("message")
+                   or j.get("message")
+                   or raw[:300])
         except Exception:
             msg = raw[:300]
         raise AgnesVideoError(f"HTTP {e.code}: {msg}") from None
@@ -290,9 +302,27 @@ def _request(url: str, api_key: str, timeout: int, payload: Optional[Dict[str, A
         raise AgnesVideoError("响应不是合法 JSON") from None
 
 
-def create_task(body: Dict[str, Any], api_key: str, base_url: str, timeout: int = 60) -> str:
-    """POST {base}/videos 创建视频任务，返回 video_id。"""
-    resp = _request(f"{base_url}/videos", api_key, timeout, payload=body, method="POST")
+def create_task(body: Dict[str, Any], api_key: str, base_url: str, timeout: int = 60,
+                max_retries: int = 6) -> str:
+    """
+    POST {base}/videos 创建视频任务，返回 video_id。
+    服务端限流（video queue is full / rate limit）按 5s×attempt 退避重试。
+    """
+    last_err: Optional[AgnesVideoError] = None
+    for attempt in range(1, max(1, max_retries) + 1):
+        try:
+            resp = _request(f"{base_url}/videos", api_key, timeout, payload=body, method="POST")
+            break
+        except AgnesVideoError as e:
+            # 队列满/限流类错误退避重试；参数错误、Key 无效等立即抛出
+            if re.search(r"queue is full|rate limit|retry later|too many", str(e), re.I):
+                last_err = e
+                if attempt < max(1, max_retries):
+                    time.sleep(5 * attempt)
+                    continue
+            raise
+    else:
+        raise last_err or AgnesVideoError("创建任务失败")
     video_id = resp.get("video_id") or resp.get("id") or resp.get("task_id")
     if not video_id:
         raise AgnesVideoError(f"创建响应中未找到 video_id: {json.dumps(resp, ensure_ascii=False)[:300]}")
